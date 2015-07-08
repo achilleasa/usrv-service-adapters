@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 
 	"github.com/achilleasa/service-adapters"
-	"github.com/achilleasa/usrv"
 	"github.com/streadway/amqp"
 )
 
@@ -39,6 +38,7 @@ type Amqp struct {
 	closeNotifier *adapters.Notifier
 }
 
+// Create a new AMQP service adapter.
 func New(amqpEndpoint string) *Amqp {
 	return &Amqp{
 		endpoint:      amqpEndpoint,
@@ -73,7 +73,7 @@ func (s *Amqp) Dial() error {
 		wait, err = s.dialPolicy.NextRetry()
 		if err != nil {
 			s.logger.Printf("Could not connect to AMQP endpoint %s after %d attempt(s)\n", s.endpoint, s.dialPolicy.CurAttempt())
-			return usrv.ErrDialFailed
+			return adapters.ErrTimeout
 		}
 		fmt.Errorf("Could not connect to AMQP endpoint %s; retrying in %v\n", s.endpoint, wait)
 		<-time.After(wait)
