@@ -117,7 +117,7 @@ func (s *Amqp) Close() {
 
 // Register a listener for receiving close notifications. The service adapter will emit an error and
 // close the channel if the service is cleanly shut down or close the channel if the connection is reset.
-func (s *Amqp) NotifyClose(c chan error) {
+func (s *Amqp) NotifyClose(c adapters.CloseListener) {
 	s.closeNotifier.Add(c)
 }
 

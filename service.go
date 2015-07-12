@@ -14,6 +14,9 @@ var (
 	ErrConnectionClosed = errors.New("Connection closed")
 )
 
+// A close listener is a channel that receives errors.
+type CloseListener chan error
+
 // All services in this package should implement this interface.
 type Service interface {
 
@@ -27,7 +30,7 @@ type Service interface {
 
 	// Register a listener for receiving close notifications. The service adapter will emit an error and
 	// close the channel if the service is cleanly shut down or close the channel if the connection is reset.
-	NotifyClose(c chan error)
+	NotifyClose(c CloseListener)
 
 	// Register a logger instance for service events.
 	SetLogger(logger *log.Logger)

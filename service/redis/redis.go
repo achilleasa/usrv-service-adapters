@@ -170,7 +170,7 @@ func (s *Redis) Close() {
 
 // Register a listener for receiving close notifications. The service adapter will emit an error and
 // close the channel if the service is cleanly shut down or close the channel if the connection is reset.
-func (s *Redis) NotifyClose(c chan error) {
+func (s *Redis) NotifyClose(c adapters.CloseListener) {
 	s.closeNotifier.Add(c)
 }
 
@@ -225,7 +225,7 @@ func (s *Redis) Config(params map[string]string) error {
 			s.logger.Println("[REDIS] Configuration error: %s", err.Error())
 			return err
 		}
-		s.connectionTimeout = time.Duration(timeout)
+		s.connectionTimeout = time.Duration(timeout) * time.Second
 		needsReset = true
 	}
 
