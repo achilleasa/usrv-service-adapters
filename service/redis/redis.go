@@ -9,7 +9,12 @@ import (
 
 	"io/ioutil"
 
+	"strconv"
+
+	"strings"
+
 	"github.com/achilleasa/service-adapters"
+	"github.com/achilleasa/service-adapters/dial"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -23,7 +28,7 @@ type Redis struct {
 	password string
 
 	// Redis DB number
-	db uint
+	db int
 
 	// Connection timeout
 	connectionTimeout time.Duration
@@ -35,7 +40,7 @@ type Redis struct {
 	sync.Mutex
 
 	// The dial policy to use.
-	dialPolicy adapters.DialPolicy
+	dialPolicy dial.Policy
 
 	// Connection status.
 	connected bool
@@ -47,16 +52,26 @@ type Redis struct {
 	closeNotifier *adapters.Notifier
 }
 
-func New(redisEndpoint string, password string, db uint, connectionTimeout time.Duration) *Redis {
-	return &Redis{
-		endpoint:          redisEndpoint,
-		password:          password,
-		db:                db,
-		connectionTimeout: connectionTimeout,
+// Create a new Redis service adapter with default settings.
+func New(options ...adapters.ServiceOption) (*Redis, error) {
+	redisSrv := &Redis{
+		endpoint:          "localhost:3679",
+		password:          "",
+		db:                0,
+		connectionTimeout: time.Second * 1,
 		logger:            log.New(ioutil.Discard, "", log.LstdFlags),
-		dialPolicy:        adapters.PeriodicPolicy(1, time.Second),
+		dialPolicy:        dial.Periodic(1, time.Second),
 		closeNotifier:     adapters.NewNotifier(),
 	}
+
+	// Apply any options
+	for _, opt := range options {
+		if err := opt(redisSrv); err != nil {
+			return nil, err
+		}
+	}
+
+	return redisSrv, nil
 }
 
 // Connect to the service. If a dial policy has been specified,
@@ -70,6 +85,15 @@ func (s *Redis) Dial() error {
 	if s.connected {
 		return adapters.ErrAlreadyConnected
 	}
+
+	s.setupPool()
+
+	return nil
+}
+
+// Setup the connection pool. This method is not thread-safe
+// so it should be invoked while holding the service lock.
+func (s *Redis) setupPool() {
 
 	// Create a new pool
 	s.pool = &redis.Pool{
@@ -87,8 +111,6 @@ func (s *Redis) Dial() error {
 
 	// Start watchdog
 	go s.watchdog()
-
-	return nil
 }
 
 // Redis pool dialer. This method is invoked whenever the redis pool allocates a new connection
@@ -109,7 +131,7 @@ func (s *Redis) dialPoolConnection() (redis.Conn, error) {
 		wait, err = s.dialPolicy.NextRetry()
 		if err != nil {
 			s.logger.Printf("Could not connect to REDIS endpoint %s after %d attempt(s)\n", s.endpoint, s.dialPolicy.CurAttempt())
-			return nil, adapters.ErrTimeout
+			return nil, dial.ErrTimeout
 		}
 		fmt.Errorf("Could not connect to REDIS endpoint %s; retrying in %v\n", s.endpoint, wait)
 		<-time.After(wait)
@@ -146,9 +168,84 @@ func (s *Redis) Close() {
 	s.connected = false
 }
 
+// Register a listener for receiving close notifications. The service adapter will emit an error and
+// close the channel if the service is cleanly shut down or close the channel if the connection is reset.
+func (s *Redis) NotifyClose(c chan error) {
+	s.closeNotifier.Add(c)
+}
+
 // Register a logger instance for service events.
 func (s *Redis) SetLogger(logger *log.Logger) {
 	s.logger = logger
+}
+
+// Set a dial policy for this service.
+func (s *Redis) SetDialPolicy(policy dial.Policy) {
+	s.dialPolicy = policy
+}
+
+// Set the service configuration. Changing the configuration settings for an already connected
+// service will trigger a service shutdown. The service consumer is responsible for handing
+// service close events and triggering a re-dial.
+func (s *Redis) Config(params map[string]string) error {
+	s.Lock()
+	defer s.Unlock()
+
+	needsReset := false
+
+	endpoint, exists := params["endpoint"]
+	if exists {
+		s.endpoint = endpoint
+		needsReset = true
+	}
+
+	password, exists := params["password"]
+	if exists {
+		s.password = password
+		needsReset = true
+	}
+
+	dbVal, exists := params["db"]
+	if exists {
+		db, err := strconv.Atoi(dbVal)
+		if err != nil {
+			err := fmt.Errorf("invalid value for setting 'db': %s\n", dbVal)
+			s.logger.Println("[REDIS] Configuration error: %s", err.Error())
+			return err
+		}
+		s.db = db
+		needsReset = true
+	}
+
+	timeoutVal, exists := params["connTimeout"]
+	if exists {
+		timeout, err := strconv.Atoi(timeoutVal)
+		if err != nil {
+			err := fmt.Errorf("invalid value for setting 'connTimeout': %s\n", timeoutVal)
+			s.logger.Println("[REDIS] Configuration error: %s", err.Error())
+			return err
+		}
+		s.connectionTimeout = time.Duration(timeout)
+		needsReset = true
+	}
+
+	if needsReset {
+		s.logger.Printf("[REDIS] Configuration changed; new settings:  endpoint=%s, password=%s, db=%d, connTimeout=%v\n",
+			s.endpoint,
+			strings.Repeat("*", len(s.password)),
+			s.db,
+			s.connectionTimeout,
+		)
+
+		// Re-init connection pool
+		s.setupPool()
+
+		if s.connected {
+			s.closeNotifier.NotifyAll(nil)
+		}
+	}
+
+	return nil
 }
 
 // Fetch a connection from the pool.
