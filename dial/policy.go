@@ -1,15 +1,21 @@
-package adapters
+package dial
 
 import (
 	"math/rand"
 	"sync"
 	"time"
+
+	"errors"
+)
+
+var (
+	ErrTimeout = errors.New("Connection timeout")
 )
 
 // A dial policy is essentially a generator of time.Duration objects
 // for dial retries. The generator should return an error if no
 // more dial attempts should be made.
-type DialPolicy interface {
+type Policy interface {
 
 	// Reset the attempt counter.
 	ResetAttempts()
@@ -59,7 +65,7 @@ func (d *dialPolicyImpl) NextRetry() (time.Duration, error) {
 
 // Implements an periodic dial policy that returns
 // the same time.Duration value between all attempts.
-func PeriodicPolicy(maxAttempts uint32, retry time.Duration) *dialPolicyImpl {
+func Periodic(maxAttempts uint32, retry time.Duration) *dialPolicyImpl {
 	if maxAttempts < 1 {
 		maxAttempts = 1
 	}
@@ -80,7 +86,7 @@ func PeriodicPolicy(maxAttempts uint32, retry time.Duration) *dialPolicyImpl {
 // a random time.Duration between 0 and 2^attempt - 1 in the
 // specified unit. Max attempts should be [1, 32]. Any
 // value outside that range will be capped to the nearest limit.
-func ExpBackoffPolicy(maxAttempts uint32, retryUnit time.Duration) *dialPolicyImpl {
+func ExpBackoff(maxAttempts uint32, retryUnit time.Duration) *dialPolicyImpl {
 	if maxAttempts < 1 {
 		maxAttempts = 1
 	}

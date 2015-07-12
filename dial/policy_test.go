@@ -1,4 +1,4 @@
-package adapters
+package dial
 
 import (
 	"testing"
@@ -9,7 +9,7 @@ func TestPeriodicPolicy(t *testing.T) {
 	var maxAttempts uint32 = 10
 	var attempt uint32
 	period := time.Second * 5
-	policy := PeriodicPolicy(maxAttempts, period)
+	policy := Periodic(maxAttempts, period)
 
 	for attempt = 0; attempt < maxAttempts; attempt++ {
 		next, err := policy.NextRetry()
@@ -41,7 +41,7 @@ func TestPeriodicPolicy(t *testing.T) {
 }
 
 func TestPeriodicPolicyLimits(t *testing.T) {
-	policy := PeriodicPolicy(0, time.Second)
+	policy := Periodic(0, time.Second)
 
 	var attempt uint32
 	for attempt = 0; attempt < 1; attempt++ {
@@ -62,7 +62,7 @@ func TestExpBackoffPolicy(t *testing.T) {
 	var maxAttempts uint32 = 10
 	var attempt uint32
 	retryUnit := time.Millisecond
-	policy := ExpBackoffPolicy(maxAttempts, retryUnit)
+	policy := ExpBackoff(maxAttempts, retryUnit)
 
 	for attempt = 0; attempt < maxAttempts; attempt++ {
 		next, err := policy.NextRetry()
@@ -85,7 +85,7 @@ func TestExpBackoffPolicy(t *testing.T) {
 }
 
 func TestExpBackoffPolicyLimits(t *testing.T) {
-	policy := ExpBackoffPolicy(0, time.Second)
+	policy := ExpBackoff(0, time.Second)
 
 	var attempt uint32
 	for attempt = 0; attempt < 1; attempt++ {
@@ -102,7 +102,7 @@ func TestExpBackoffPolicyLimits(t *testing.T) {
 	}
 
 	// Try upper limit
-	policy = ExpBackoffPolicy(40, time.Second)
+	policy = ExpBackoff(40, time.Second)
 
 	for attempt = 0; attempt < 32; attempt++ {
 		_, err := policy.NextRetry()
