@@ -14,11 +14,11 @@ Features:
 
 # Required dependencies
 
-| Service    | Required depenencies |
-|------------|----------------------|
-| redis      | ```go get github.com/garyburd/redigo/redis```
-| rabbitmq   | ```go get github.com/streadway/amqp```
-| etcd       | ```go get github.com/coreos/go-etcd``` ```go get github.com/ugorji/go/codec```
+| Service | Required depenencies |
+|---------|----------------------|
+| redis   | ```go get github.com/garyburd/redigo/redis```
+| rabbitmq| ```go get github.com/streadway/amqp```
+| etcd    | ```go get github.com/coreos/go-etcd``` ```go get github.com/ugorji/go/codec```
 
 
 
@@ -38,7 +38,8 @@ service adapters will cause the service to reset whenever the settings change. Y
 the config settings after the service has been instanciated using its `Config` method. 
 
 Example usage:
-```
+
+```go
 package main
 
 import (
@@ -70,7 +71,8 @@ By default, all services are provisioned with a /dev/null logger that discards a
 attach the logger after the service has been instanciated using its `SetLogger` method.
 
 Example usage:
-```
+
+```go
 package main
 
 import (
@@ -106,7 +108,8 @@ A dial policy is essentially a generator of retry intervals (modeled as time.Dur
 The periodic dial policy generates a bounded number of retry intervals using a fixed period. 
 
 Example usage:
-```
+
+```go
 package main
 
 import (
@@ -137,7 +140,8 @@ The exponential back-off dial policy generates a random retry interval in the ra
 prevent connection hammering. The maximum number of attempts that may be specified is 32 (higher numbers will be capped to 32). 
 
 Example usage:
-```
+
+```go
 package main
 
 import (
@@ -182,13 +186,13 @@ The following configuration settings are supported:
 | endpoint     | Redis server endpoint | `localhost:6379`
 | password     | The password to use   | `""` (no password)
 | db           | The db index to use   | `0`
-| connTimeout  | The connection timeout in seconds | `1` second
+| connTimeout  | The connection timeout in seconds | `1` second
 
 The default values will be used if no settings are specified.
 
 ## Example
 
-```
+```go
 package main
 
 import "github.com/achilleasa/service-adapters/service/redis"
@@ -236,7 +240,7 @@ The default values will be used if no settings are specified.
 
 ## Example
 
-```
+```go
 package main
 
 import "github.com/achilleasa/service-adapters/service/amqp"
@@ -270,7 +274,8 @@ The `Config` service option (and service instance method) provides a mechanism f
 service configuration management to an external service. Automatic configuration (and most importantly re-configuration)
 is essential when working with a microservice architecture.
 
-The `etcd` sub-package provides an automatic configuration server option that uses etcd to retrieve the service settings
+The `etcd` sub-package provides
+an automatic configuration server option that uses etcd to retrieve the service settings
 from a user-defined key and to set up a monitor for value changes. When a value change is detected, the middleware will
 parse the updated value into a map and then reconfigure the service with the updated settings.
 
@@ -289,10 +294,10 @@ curl http://127.0.0.1:4001/v2/keys/config/service/redis \
      -d value="endpoint=127.0.0.1:6379 db=0"
 ```
 
-The following program will create a redis service adaptor, attach the etcd configuration middleware and a logger for monitoring 
-configuration change events. It will block till `ctrl+c` is pressed.
+The following program will create a redis service adaptor, attach the etcd configuration middleware and a
+logger for monitoring configuration change events. It will block till `ctrl+c` is pressed.
      
-```
+```go
 package main
 
 import (
@@ -348,7 +353,8 @@ The middleware will pickup the change and reconfigure the service adaptor. It wi
 
 `2015/07/12 18:46:00 [REDIS] Configuration changed; new settings:  endpoint=127.0.0.1:6379, password=, db=1, connTimeout=2s`
 
+# License
 
-
+service-adapters is distributed under the [MIT license](https://github.com/achilleasa/service-adapters/blob/master/LICENSE).
 
 
