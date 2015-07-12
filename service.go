@@ -3,13 +3,14 @@ package adapters
 import (
 	"errors"
 	"log"
+
+	"github.com/achilleasa/service-adapters/dial"
 )
 
 // Common service errors
 
 var (
 	ErrAlreadyConnected = errors.New("Already connected")
-	ErrTimeout          = errors.New("Connection timeout")
 	ErrConnectionClosed = errors.New("Connection closed")
 )
 
@@ -30,4 +31,12 @@ type Service interface {
 
 	// Register a logger instance for service events.
 	SetLogger(logger *log.Logger)
+
+	// Set a dial policy for this service.
+	SetDialPolicy(policy dial.Policy)
+
+	// Set the service configuration. Changing the configuration settings for an already connected
+	// service will trigger a service shutdown. The service consumer is responsible for handing
+	// service close events and triggering a re-dial.
+	Config(params map[string]string) error
 }
