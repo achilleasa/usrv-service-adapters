@@ -4,7 +4,7 @@ import (
 	"errors"
 	"log"
 
-	"github.com/achilleasa/service-adapters/dial"
+	"github.com/achilleasa/usrv-service-adapters/dial"
 )
 
 // Common service errors

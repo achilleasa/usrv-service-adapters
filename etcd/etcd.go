@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/achilleasa/service-adapters"
+	"github.com/achilleasa/usrv-service-adapters"
 	etcdPkg "github.com/coreos/go-etcd/etcd"
 )
 

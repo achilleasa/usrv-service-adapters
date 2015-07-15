@@ -1,4 +1,4 @@
-# service-adapters
+# usrv-service-adapters
 
 This package is essentially a support package for [usrv](https://github.com/achilleasa/usrv)
 and related-packages although it can also be used standalone. It provides a common interface
@@ -6,7 +6,7 @@ for configuring and instanciating services such as redis and rabbitmq.
 
 Features:
 
-- Common [interface](https://github.com/achilleasa/service-adapters/blob/master/service.go) for managing and configuring services
+- Common [interface](https://github.com/achilleasa/usrv-service-adapters/blob/master/service.go) for managing and configuring services
 - Dial policies (periodic, exp. backoff or user-defined)
 - Modular configuration (etcd plugin or plain maps)
 - Service close notifications
@@ -18,7 +18,7 @@ Features:
 |---------|----------------------|
 | redis   | ```go get github.com/garyburd/redigo/redis```
 | rabbitmq| ```go get github.com/streadway/amqp```
-| etcd    | ```go get github.com/coreos/go-etcd``` ```go get github.com/ugorji/go/codec```
+| etcd    | ```go get github.com/coreos/go-etcd/...``` ```go get github.com/ugorji/go/codec```
 
 
 
@@ -43,8 +43,8 @@ Example usage:
 package main
 
 import (
-	"github.com/achilleasa/service-adapters/service/redis"
-	"github.com/achilleasa/service-adapters"
+	"github.com/achilleasa/usrv-service-adapters/service/redis"
+	"github.com/achilleasa/usrv-service-adapters"
 )
 
 func setup() *redis.Redis {
@@ -79,8 +79,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/achilleasa/service-adapters"
-	"github.com/achilleasa/service-adapters/service/redis"
+	"github.com/achilleasa/usrv-service-adapters"
+	"github.com/achilleasa/usrv-service-adapters/service/redis"
 )
 
 func setup() *redis.Redis {
@@ -113,9 +113,9 @@ Example usage:
 package main
 
 import (
-	"github.com/achilleasa/service-adapters"
-	"github.com/achilleasa/service-adapters/service/redis"
-	"github.com/achilleasa/service-adapters/dial"
+	"github.com/achilleasa/usrv-service-adapters"
+	"github.com/achilleasa/usrv-service-adapters/service/redis"
+	"github.com/achilleasa/usrv-service-adapters/dial"
 	"time"
 )
 
@@ -145,9 +145,9 @@ Example usage:
 package main
 
 import (
-	"github.com/achilleasa/service-adapters"
-	"github.com/achilleasa/service-adapters/service/redis"
-	"github.com/achilleasa/service-adapters/dial"
+	"github.com/achilleasa/usrv-service-adapters"
+	"github.com/achilleasa/usrv-service-adapters/service/redis"
+	"github.com/achilleasa/usrv-service-adapters/dial"
 	"time"
 )
 
@@ -169,7 +169,7 @@ func setup() *redis.Redis {
 
 ### Implementing a custom dial policy
 
-To create a custom dial policy you need to implement the [Policy](https://github.com/achilleasa/service-adapters/blob/master/dial/policy.go#L18) interface. You can then pass an instance of the custom dial policy either via the `DialPolicy` service option during service instanciation or via the `SetDialPolicy` method on the instanciated service object.
+To create a custom dial policy you need to implement the [Policy](https://github.com/achilleasa/usrv-service-adapters/blob/master/dial/policy.go#L18) interface. You can then pass an instance of the custom dial policy either via the `DialPolicy` service option during service instanciation or via the `SetDialPolicy` method on the instanciated service object.
 
 # Getting started: redis
 
@@ -195,7 +195,7 @@ The default values will be used if no settings are specified.
 ```go
 package main
 
-import "github.com/achilleasa/service-adapters/service/redis"
+import "github.com/achilleasa/usrv-service-adapters/service/redis"
 
 func demo() {
 
@@ -243,7 +243,7 @@ The default values will be used if no settings are specified.
 ```go
 package main
 
-import "github.com/achilleasa/service-adapters/service/amqp"
+import "github.com/achilleasa/usrv-service-adapters/service/amqp"
 
 func demo() {
 
@@ -307,9 +307,9 @@ import (
 
 	"log"
 
-	"github.com/achilleasa/service-adapters"
-	"github.com/achilleasa/service-adapters/etcd"
-	"github.com/achilleasa/service-adapters/service/redis"
+	"github.com/achilleasa/usrv-service-adapters"
+	"github.com/achilleasa/usrv-service-adapters/etcd"
+	"github.com/achilleasa/usrv-service-adapters/service/redis"
 )
 
 func main() {
@@ -355,6 +355,6 @@ The middleware will pickup the change and reconfigure the service adaptor. It wi
 
 # License
 
-service-adapters is distributed under the [MIT license](https://github.com/achilleasa/service-adapters/blob/master/LICENSE).
+usrv-service-adapters is distributed under the [MIT license](https://github.com/achilleasa/usrv-service-adapters/blob/master/LICENSE).
 
 

@@ -13,8 +13,8 @@ import (
 
 	"strings"
 
-	"github.com/achilleasa/service-adapters"
-	"github.com/achilleasa/service-adapters/dial"
+	"github.com/achilleasa/usrv-service-adapters"
+	"github.com/achilleasa/usrv-service-adapters/dial"
 	"github.com/garyburd/redigo/redis"
 )
 

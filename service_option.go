@@ -3,7 +3,7 @@ package adapters
 import (
 	"log"
 
-	"github.com/achilleasa/service-adapters/dial"
+	"github.com/achilleasa/usrv-service-adapters/dial"
 )
 
 // Functional option arg type for services.
