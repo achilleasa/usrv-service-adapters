@@ -10,7 +10,6 @@ import (
 // Common service errors
 
 var (
-	ErrAlreadyConnected = errors.New("Already connected")
 	ErrConnectionClosed = errors.New("Connection closed")
 )
 
@@ -31,6 +30,10 @@ type Service interface {
 	// Register a listener for receiving close notifications. The service adapter will emit an error and
 	// close the channel if the service is cleanly shut down or close the channel if the connection is reset.
 	NotifyClose(c CloseListener)
+
+	// Apply service options. This is a convenience method for initializing the service
+	// without invoking multiple methods.
+	SetOptions(opts ...ServiceOption) error
 
 	// Register a logger instance for service events.
 	SetLogger(logger *log.Logger)

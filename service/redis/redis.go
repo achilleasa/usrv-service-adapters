@@ -77,7 +77,7 @@ func (s *Redis) Dial() error {
 
 	// We are already connected
 	if s.connected {
-		return adapters.ErrAlreadyConnected
+		return nil
 	}
 
 	s.setupPool()

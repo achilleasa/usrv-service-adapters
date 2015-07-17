@@ -60,7 +60,7 @@ func (s *Amqp) Dial() error {
 
 	// We are already connected
 	if s.connected {
-		return adapters.ErrAlreadyConnected
+		return nil
 	}
 
 	var err error
