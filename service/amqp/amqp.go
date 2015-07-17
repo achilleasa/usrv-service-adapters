@@ -1,7 +1,6 @@
 package amqp
 
 import (
-	"fmt"
 	"log"
 	"sync"
 
@@ -11,8 +10,21 @@ import (
 
 	"github.com/achilleasa/usrv-service-adapters"
 	"github.com/achilleasa/usrv-service-adapters/dial"
-	"github.com/streadway/amqp"
+	amqpDriver "github.com/streadway/amqp"
 )
+
+// Adapter is a singleton instance of a amqp service
+var Adapter *Amqp
+
+// Initialize the service using default values
+func init() {
+	Adapter = &Amqp{
+		endpoint:      "localhost:55672",
+		logger:        log.New(ioutil.Discard, "", log.LstdFlags),
+		dialPolicy:    dial.Periodic(1, time.Second),
+		closeNotifier: adapters.NewNotifier(),
+	}
+}
 
 type Amqp struct {
 
@@ -33,29 +45,10 @@ type Amqp struct {
 	connected bool
 
 	// AMQP connection handle.
-	conn *amqp.Connection
+	conn *amqpDriver.Connection
 
 	// A notifier for close events.
 	closeNotifier *adapters.Notifier
-}
-
-// Create a new AMQP service adapter with default settings.
-func New(options ...adapters.ServiceOption) (*Amqp, error) {
-	amqpSrv := &Amqp{
-		endpoint:      "localhost:55672",
-		logger:        log.New(ioutil.Discard, "", log.LstdFlags),
-		dialPolicy:    dial.Periodic(1, time.Second),
-		closeNotifier: adapters.NewNotifier(),
-	}
-
-	// Apply any options
-	for _, opt := range options {
-		if err := opt(amqpSrv); err != nil {
-			return nil, err
-		}
-	}
-
-	return amqpSrv, nil
 }
 
 // Connect to the service. If a dial policy has been specified,
@@ -75,7 +68,7 @@ func (s *Amqp) Dial() error {
 	wait, err = s.dialPolicy.NextRetry()
 	for {
 		s.logger.Printf("[AMQP] Connecting to endpoint %s; attempt %d", s.endpoint, s.dialPolicy.CurAttempt())
-		s.conn, err = amqp.Dial(s.endpoint)
+		s.conn, err = amqpDriver.Dial(s.endpoint)
 		if err == nil {
 			break
 		}
@@ -85,7 +78,7 @@ func (s *Amqp) Dial() error {
 			s.logger.Printf("[AMQP] Could not connect to endpoint %s after %d attempt(s)\n", s.endpoint, s.dialPolicy.CurAttempt())
 			return dial.ErrTimeout
 		}
-		fmt.Errorf("[AMQP] Could not connect to endpoint %s; retrying in %v\n", s.endpoint, wait)
+		s.logger.Printf("[AMQP] Could not connect to endpoint %s; retrying in %v\n", s.endpoint, wait)
 		<-time.After(wait)
 	}
 
@@ -119,6 +112,16 @@ func (s *Amqp) Close() {
 // close the channel if the service is cleanly shut down or close the channel if the connection is reset.
 func (s *Amqp) NotifyClose(c adapters.CloseListener) {
 	s.closeNotifier.Add(c)
+}
+
+// Apply a list of options to the service.
+func (s *Amqp) SetOptions(opts ...adapters.ServiceOption) error {
+	for _, opt := range opts {
+		if err := opt(s); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Register a logger instance for service events.
@@ -160,7 +163,7 @@ func (s *Amqp) Config(params map[string]string) error {
 }
 
 // Allocate new amqp channel.
-func (s *Amqp) NewChannel() (*amqp.Channel, error) {
+func (s *Amqp) NewChannel() (*amqpDriver.Channel, error) {
 	s.Lock()
 	defer s.Unlock()
 
@@ -173,7 +176,7 @@ func (s *Amqp) NewChannel() (*amqp.Channel, error) {
 
 // A worker that listens for service-related notifications or configuration changes.
 func (s *Amqp) watchdog() {
-	amqpClose := make(chan *amqp.Error)
+	amqpClose := make(chan *amqpDriver.Error)
 	s.conn.NotifyClose(amqpClose)
 
 	select {

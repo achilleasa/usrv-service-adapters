@@ -15,8 +15,24 @@ import (
 
 	"github.com/achilleasa/usrv-service-adapters"
 	"github.com/achilleasa/usrv-service-adapters/dial"
-	"github.com/garyburd/redigo/redis"
+	redisDriver "github.com/garyburd/redigo/redis"
 )
+
+// Adapter is a singleton instance of a redis service
+var Adapter *Redis
+
+// Initialize the service using default values
+func init() {
+	Adapter = &Redis{
+		endpoint:          "localhost:3679",
+		password:          "",
+		db:                0,
+		connectionTimeout: time.Second * 1,
+		logger:            log.New(ioutil.Discard, "", log.LstdFlags),
+		dialPolicy:        dial.Periodic(1, time.Second),
+		closeNotifier:     adapters.NewNotifier(),
+	}
+}
 
 type Redis struct {
 
@@ -46,32 +62,10 @@ type Redis struct {
 	connected bool
 
 	// Redis pool
-	pool *redis.Pool
+	pool *redisDriver.Pool
 
 	// A notifier for close events.
 	closeNotifier *adapters.Notifier
-}
-
-// Create a new Redis service adapter with default settings.
-func New(options ...adapters.ServiceOption) (*Redis, error) {
-	redisSrv := &Redis{
-		endpoint:          "localhost:3679",
-		password:          "",
-		db:                0,
-		connectionTimeout: time.Second * 1,
-		logger:            log.New(ioutil.Discard, "", log.LstdFlags),
-		dialPolicy:        dial.Periodic(1, time.Second),
-		closeNotifier:     adapters.NewNotifier(),
-	}
-
-	// Apply any options
-	for _, opt := range options {
-		if err := opt(redisSrv); err != nil {
-			return nil, err
-		}
-	}
-
-	return redisSrv, nil
 }
 
 // Connect to the service. If a dial policy has been specified,
@@ -96,11 +90,11 @@ func (s *Redis) Dial() error {
 func (s *Redis) setupPool() {
 
 	// Create a new pool
-	s.pool = &redis.Pool{
+	s.pool = &redisDriver.Pool{
 		MaxIdle:     3,
 		IdleTimeout: 240 * time.Second,
 		Dial:        s.dialPoolConnection,
-		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+		TestOnBorrow: func(c redisDriver.Conn, t time.Time) error {
 			_, err := c.Do("PING")
 			return err
 		},
@@ -108,22 +102,19 @@ func (s *Redis) setupPool() {
 
 	s.connected = true
 	s.dialPolicy.ResetAttempts()
-
-	// Start watchdog
-	go s.watchdog()
 }
 
 // Redis pool dialer. This method is invoked whenever the redis pool allocates a new connection
-func (s *Redis) dialPoolConnection() (redis.Conn, error) {
+func (s *Redis) dialPoolConnection() (redisDriver.Conn, error) {
 	s.Lock()
 	defer s.Unlock()
 
 	var err error
 	var wait time.Duration
-	var c redis.Conn
+	var c redisDriver.Conn
 	wait, err = s.dialPolicy.NextRetry()
 	for {
-		c, err = redis.DialTimeout("tcp", s.endpoint, s.connectionTimeout, 0, 0)
+		c, err = redisDriver.DialTimeout("tcp", s.endpoint, s.connectionTimeout, 0, 0)
 		if err == nil {
 			break
 		}
@@ -133,7 +124,7 @@ func (s *Redis) dialPoolConnection() (redis.Conn, error) {
 			s.logger.Printf("Could not connect to REDIS endpoint %s after %d attempt(s)\n", s.endpoint, s.dialPolicy.CurAttempt())
 			return nil, dial.ErrTimeout
 		}
-		fmt.Errorf("Could not connect to REDIS endpoint %s; retrying in %v\n", s.endpoint, wait)
+		s.logger.Printf("Could not connect to REDIS endpoint %s; retrying in %v\n", s.endpoint, wait)
 		<-time.After(wait)
 	}
 
@@ -172,6 +163,16 @@ func (s *Redis) Close() {
 // close the channel if the service is cleanly shut down or close the channel if the connection is reset.
 func (s *Redis) NotifyClose(c adapters.CloseListener) {
 	s.closeNotifier.Add(c)
+}
+
+// Apply a list of options to the service.
+func (s *Redis) SetOptions(opts ...adapters.ServiceOption) error {
+	for _, opt := range opts {
+		if err := opt(s); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Register a logger instance for service events.
@@ -249,7 +250,7 @@ func (s *Redis) Config(params map[string]string) error {
 }
 
 // Fetch a connection from the pool.
-func (s *Redis) GetConnection() (redis.Conn, error) {
+func (s *Redis) GetConnection() (redisDriver.Conn, error) {
 	s.Lock()
 	if !s.connected {
 		s.Unlock()
@@ -262,8 +263,4 @@ func (s *Redis) GetConnection() (redis.Conn, error) {
 		return nil, conn.Err()
 	}
 	return conn, nil
-}
-
-// A worker that listens for service-related notifications or configuration changes.
-func (s *Redis) watchdog() {
 }
