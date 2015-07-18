@@ -29,7 +29,7 @@ func init() {
 		db:                0,
 		connectionTimeout: time.Second * 1,
 		logger:            log.New(ioutil.Discard, "", log.LstdFlags),
-		dialPolicy:        dial.Periodic(1, time.Second),
+		dialPolicy:        dial.ExpBackoff(10, time.Millisecond),
 		closeNotifier:     adapters.NewNotifier(),
 	}
 }
@@ -112,6 +112,7 @@ func (s *Redis) dialPoolConnection() (redisDriver.Conn, error) {
 	var err error
 	var wait time.Duration
 	var c redisDriver.Conn
+	s.dialPolicy.ResetAttempts()
 	wait, err = s.dialPolicy.NextRetry()
 	for {
 		c, err = redisDriver.DialTimeout("tcp", s.endpoint, s.connectionTimeout, 0, 0)

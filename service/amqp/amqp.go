@@ -14,16 +14,11 @@ import (
 )
 
 // Adapter is a singleton instance of a amqp service
-var Adapter *Amqp
-
-// Initialize the service using default values
-func init() {
-	Adapter = &Amqp{
-		endpoint:      "localhost:55672",
-		logger:        log.New(ioutil.Discard, "", log.LstdFlags),
-		dialPolicy:    dial.Periodic(1, time.Second),
-		closeNotifier: adapters.NewNotifier(),
-	}
+var Adapter *Amqp = &Amqp{
+	endpoint:      "localhost:55672",
+	logger:        log.New(ioutil.Discard, "", log.LstdFlags),
+	dialPolicy:    dial.ExpBackoff(10, time.Millisecond),
+	closeNotifier: adapters.NewNotifier(),
 }
 
 type Amqp struct {
@@ -65,9 +60,10 @@ func (s *Amqp) Dial() error {
 
 	var err error
 	var wait time.Duration
+	s.dialPolicy.ResetAttempts()
 	wait, err = s.dialPolicy.NextRetry()
+	s.logger.Printf("[AMQP] Connecting to endpoint %s\n", s.endpoint)
 	for {
-		s.logger.Printf("[AMQP] Connecting to endpoint %s; attempt %d", s.endpoint, s.dialPolicy.CurAttempt())
 		s.conn, err = amqpDriver.Dial(s.endpoint)
 		if err == nil {
 			break
