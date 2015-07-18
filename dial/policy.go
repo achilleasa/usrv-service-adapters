@@ -101,7 +101,7 @@ func ExpBackoff(maxAttempts uint32, retryUnit time.Duration) *dialPolicyImpl {
 				return 0, ErrTimeout
 			}
 
-			return time.Duration(rand.Int63n(1 << curAttempt)), nil
+			return retryUnit * time.Duration(rand.Int63n(1<<curAttempt)), nil
 		},
 	}
 }
