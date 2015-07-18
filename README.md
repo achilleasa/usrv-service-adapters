@@ -2,7 +2,7 @@
 
 This package is essentially a support package for [usrv](https://github.com/achilleasa/usrv)
 and related-packages although it can also be used standalone. It provides a common interface
-for configuring and instanciating services such as redis and rabbitmq.
+for configuring and instanciating services such as etcd, redis and rabbitmq.
 
 Features:
 
@@ -24,12 +24,49 @@ Features:
 
 # Service close notifications
 
-You may register one or more 
+You may register one or more `char error` listeners to be notified when a particular service is
+shutdown or reset (e.g lost connection or configuration has changed).
+
+During a normal shutdown, `ErrConnectionClosed` will be emitted to the listener
+channel and then the channel will be **closed**. During a reset, the channel will be immediately
+closed (no error). In both cases, a new listener needs to be registered to receive further events.
+Here is an example on handling close notifications:
+
+```go
+package main
+
+import (
+	"github.com/achilleasa/usrv-service-adapters"
+)
+
+func example(srv adapters.Service) {
+	listener := make(chan error)
+	srv.NotifyClose(listener)
+
+	select {
+	case _, connReset := <-listener:
+		if connReset {
+			srv.Dial()
+		} else {
+			// Connection closed...
+		}
+	}
+}
+```
+
+# Using the service adapters
+
+Each package in the `service` subpackage defines a globally visible `Adaptor` that you should use for interfacing with
+the wrapped service. The `Adaptor` is pre-configured with the default settings for the service.
+
+You can however, alter the configuration using the `Config` method or by applying the `Config` service option
+using the `SetOptions` method.
 
 # Service options
 
-You can apply zero or more service options when instanciating a service using its `New()` method. All
-options follow the [functional arguments](http://commandcenter.blogspot.com/2014/01/self-referential-functions-and-design.html) pattern.
+The package defines some convenience methods that allow you to apply a set of options to the service adaptors via the
+`SetOptions` call. The methods implement the [functional arguments](http://commandcenter.blogspot.com/2014/01/self-referential-functions-and-design.html)
+pattern.
 
 ## Config
 
@@ -47,19 +84,17 @@ import (
 	"github.com/achilleasa/usrv-service-adapters"
 )
 
-func setup() *redis.Redis {
+func setup(){
 	opts := map[string]string{
 		"endpoint" : "localhost:6379",
 	}
 
-	redisSrv, err := redis.New(
+	err := redis.Adapter.SetOptions(
 		adapters.Config(opts),
 	)
 	if err != nil {
 		panic(err)
 	}
-
-	return redisSrv
 }
 ```
 
@@ -83,17 +118,16 @@ import (
 	"github.com/achilleasa/usrv-service-adapters/service/redis"
 )
 
-func setup() *redis.Redis {
+func setup(){
 	logger := log.New(os.Stderr, "[Custom Logger]", log.LstdFlags)
 
-	redisSrv, err := redis.New(
+	err := redis.Adapter.SetOptions(
 		adapters.Logger(logger),
 	)
 	if err != nil {
 		panic(err)
 	}
 
-	return redisSrv
 }
 ```
 
@@ -119,18 +153,16 @@ import (
 	"time"
 )
 
-func setup() *redis.Redis {
+func setup() {
 	// Retry every 200ms up to a total of 10 attempts
 	dialPolicy := dial.Periodic(10, time.Millisecond * 200)
 
-	redisSrv, err := redis.New(
+	err := redis.Adapter.SetOptions(
 		adapters.DialPolicy(dialPolicy),
 	)
 	if err != nil {
 		panic(err)
 	}
-
-	return redisSrv
 }
 ```
 
@@ -151,19 +183,17 @@ import (
 	"time"
 )
 
-func setup() *redis.Redis {
+func setup(){
 	// Generate a retry interval in ms between [0, 2^attempt) 
 	// up to a total of 10 attempts
 	dialPolicy := dial.ExpBackoff(10, time.Millisecond)
 
-	redisSrv, err := redis.New(
+	err := redis.Adapter.SetOptions(
 		adapters.DialPolicy(dialPolicy),
 	)
 	if err != nil {
 		panic(err)
 	}
-
-	return redisSrv
 }
 ```
 
@@ -188,7 +218,8 @@ The following configuration settings are supported:
 | db           | The db index to use   | `0`
 | connTimeout  | The connection timeout in seconds | `1` second
 
-The default values will be used if no settings are specified.
+The default values will be used if no settings are specified. By default, the adapter uses
+the [exp backoff](#exponential-back-off-dial-policy) dial policy (10 attempts, time.Millisecond retry unit).
 
 ## Example
 
@@ -199,20 +230,14 @@ import "github.com/achilleasa/usrv-service-adapters/service/redis"
 
 func demo() {
 
-	// Use the default periodic dial policy with 1 attempt
-	redisSrv, err := redis.New()
+	err = redis.Adapter.Dial()
 	if err != nil {
 		panic(err)
 	}
-
-	err = redisSrv.Dial()
-	if err != nil {
-		panic(err)
-	}
-	defer redisSrv.Close()
+	defer redis.Adapter.Close()
 
 	// Get a connection from the pool.
-	conn, err := redisSrv.GetConnection()
+	conn, err := redis.Adapter.GetConnection()
 	if err != nil {
 		panic(err)
 	}
@@ -236,7 +261,8 @@ The following configuration settings are supported:
 | endpoint     | rabbit server endpoint including auth credentials | `amqp://guest:guest@localhost:5672/`
 
 
-The default values will be used if no settings are specified.
+The default values will be used if no settings are specified. By default, the adapter uses
+the [exp backoff](#exponential-back-off-dial-policy) dial policy (10 attempts, time.Millisecond retry unit).
 
 ## Example
 
@@ -247,20 +273,14 @@ import "github.com/achilleasa/usrv-service-adapters/service/amqp"
 
 func demo() {
 
-	// Use the default periodic dial policy with 1 attempt
-	rabbitSrv, err := amqp.New()
+	err = amqp.Adapter.Dial()
 	if err != nil {
 		panic(err)
 	}
-
-	err = rabbitSrv.Dial()
-	if err != nil {
-		panic(err)
-	}
-	defer rabbitSrv.Close()
+	defer amqp.Adapter.Close()
 
 	// Allocate amqp channel and do something with it
-	channel, err := rabbitSrv.NewChannel()
+	channel, err := amqp.Adapter.NewChannel()
 	if err != nil {
 		panic(err)
 	}
@@ -268,20 +288,56 @@ func demo() {
 }
 ```
 
-# Automatic service configuration
+# Getting started: etcd
 
-The `Config` service option (and service instance method) provides a mechanism for delegating the actual
-service configuration management to an external service. Automatic configuration (and most importantly re-configuration)
-is essential when working with a microservice architecture.
+The etcd service adaptor wraps the [go-etcd client](https://github.com/coreos/go-etcd).
+
+## Configuration settings
+
+The following configuration settings are supported:
+
+| Setting name | Description           | Default value   |
+|--------------|-----------------------|-----------------|
+| hosts        | comma-delimited etcd host list | `http://127.0.0.1:4001`
+
+The default values will be used if no settings are specified. By default, the adapter uses
+the [exp backoff](#exponential-back-off-dial-policy) dial policy (10 attempts, time.Millisecond retry unit).
+
+## Example
+
+```go
+package main
+
+import "github.com/achilleasa/usrv-service-adapters/service/etcd"
+import "log"
+imoprt "os"
+
+func demo() {
+
+	// Attach a logger and use a different host configuration (e.g dockerized etcd)
+	err := etcd.Adapter.SetOptions(
+		adapters.Logger(log.New(os.Stdout, "", log.LstdFlags)),
+		adapters.Config(map[string]string{"hosts": "http://192.168.59.103:4001"}),
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer etcd.Adapter.Close()
+
+	// Do something with the adapter
+}
+```
+
+## Automatic adapter configuration via etcd
 
 The `etcd` sub-package provides
-an automatic configuration server option that uses etcd to retrieve the service settings
+an automatic configuration server option (`AutoConf`) that uses etcd to retrieve the service settings
 from a user-defined key and to set up a monitor for value changes. When a value change is detected, the middleware will
 parse the updated value into a map and then reconfigure the service with the updated settings.
 
 The current implementation expects the etcd value to contain a list of ```key=value``` entries (you can use any number of whitespace characters to delimit the value tuples).
 
-## Example
+### Example
 
 Lets assume that you have launched an etcd v2+ instance and it is currently listening at: `http://127.0.0.1:4001`. Our redis
 server is also running at localhost on port 6379
@@ -308,17 +364,15 @@ import (
 	"log"
 
 	"github.com/achilleasa/usrv-service-adapters"
-	"github.com/achilleasa/usrv-service-adapters/etcd"
+	"github.com/achilleasa/usrv-service-adapters/service/etcd"
 	"github.com/achilleasa/usrv-service-adapters/service/redis"
 )
 
 func main() {
 
-	etcdSrv := etcd.New("http://127.0.0.1:4001")
-
-	redisSrv, err := redis.New(
+	err := redis.Adapter.New(
 		adapters.Logger(log.New(os.Stderr, "", log.LstdFlags)),
-		etcd.Config(etcdSrv, "/config/service/redis"),
+		etcd.AutoConf("/config/service/redis"),
 	)
 	if err != nil {
 		panic(err)
