@@ -176,14 +176,18 @@ func (s *Amqp) watchdog() {
 	s.conn.NotifyClose(amqpClose)
 
 	select {
-	case _, normalShutdown := <-amqpClose:
-		if normalShutdown {
+	case err := <-amqpClose:
+		// Reset connection
+		s.Lock()
+		s.conn = nil
+		s.connected = false
+		s.Unlock()
+		if err == nil {
 			s.closeNotifier.NotifyAll(adapters.ErrConnectionClosed)
 			s.logger.Printf("[AMQP] Disconnected from endpoint %s\n", s.endpoint)
 		} else {
 			s.closeNotifier.NotifyAll(nil)
 			s.logger.Printf("[AMQP] Lost connection to endpoint %s\n", s.endpoint)
-
 		}
 	}
 }
